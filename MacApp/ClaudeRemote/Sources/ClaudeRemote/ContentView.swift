@@ -43,6 +43,10 @@ struct ContentView: View {
             if app.wakeState != .idle { WakeCardView() }
         }
         .overlay {
+            // Gömülü Tailscale login gerekiyorsa (resmi Tailscale yok): giriş kartı.
+            if app.tsnetAuthURL != nil && !app.connected { TsnetLoginOverlay() }
+        }
+        .overlay {
             // Kurulmamış (ilk açılış) ya da yeniden açıldıysa: kurulum sihirbazı (en üstte).
             if !app.setupComplete || app.showSetupWizard {
                 SetupWizardView()

@@ -313,7 +313,7 @@ struct NativeChatView: View {
     init(app: AppState, target: ChatTarget) {
         self.target = target
         _chat = StateObject(wrappedValue: ChatSession(
-            host: app.host, port: Int(app.portText) ?? 8787, token: app.token,
+            host: app.effectiveHost, port: app.effectivePort, token: app.token,
             model: app.selectedModel, mode: app.permissionMode, effort: app.effort,
             resume: target.resume, cwd: target.cwd))
     }

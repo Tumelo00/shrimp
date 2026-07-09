@@ -111,3 +111,29 @@ struct WakeCardView: View {
             .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
     }
 }
+
+/// Gömülü Tailscale (tsnet) login gerektiğinde: tarayıcıda onay kartı.
+struct TsnetLoginOverlay: View {
+    @EnvironmentObject var app: AppState
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.ultraThinMaterial).ignoresSafeArea()
+            Color.black.opacity(0.28).ignoresSafeArea()
+            VStack(spacing: 14) {
+                Image(systemName: "network.badge.shield.half.filled").font(.system(size: 40)).foregroundStyle(Color.accentColor)
+                Text("Tailscale'e Giriş").font(.title3).bold()
+                Text("Shrimp'in gömülü Tailscale'i PC'ne bağlanmak için hesabınla eşleşmeli. Tarayıcıda onayla; bu cihaz (shrimp-mac) tailnet'ine eklenir.")
+                    .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button { app.openTsnetLogin() } label: {
+                    Label("Tarayıcıda Giriş Yap", systemImage: "arrow.up.right.square")
+                }.buttonStyle(.borderedProminent).controlSize(.large)
+                Text("Onayladıktan sonra otomatik bağlanır.").font(.caption).foregroundStyle(.tertiary)
+            }
+            .frame(width: 380).padding(26)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.white.opacity(0.08)))
+            .shadow(color: .black.opacity(0.35), radius: 24, y: 10)
+        }
+    }
+}

@@ -39,6 +39,22 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Shrimp"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" 2>/dev/null && echo "    ikon gomuldu"
 
+# tsnet helper (gömülü userspace Tailscale) — resmi Tailscale gerekmesin diye
+TSNET_BIN=""
+if [ -f ../../tsnet-helper/shrimp-tsnet ]; then TSNET_BIN=../../tsnet-helper/shrimp-tsnet
+elif [ -f "$HOME/tsnet-helper/shrimp-tsnet" ]; then TSNET_BIN="$HOME/tsnet-helper/shrimp-tsnet"
+elif command -v go >/dev/null 2>&1 && [ -f ../../tsnet-helper/main.go ]; then
+  echo "==> tsnet helper derleniyor (go build)"
+  ( cd ../../tsnet-helper && go build -o shrimp-tsnet . ) && TSNET_BIN=../../tsnet-helper/shrimp-tsnet
+fi
+if [ -n "$TSNET_BIN" ] && [ -f "$TSNET_BIN" ]; then
+  cp "$TSNET_BIN" "$APP/Contents/Resources/shrimp-tsnet"
+  chmod +x "$APP/Contents/Resources/shrimp-tsnet"
+  echo "    tsnet gömüldü ($(du -h "$TSNET_BIN" | cut -f1))"
+else
+  echo "    UYARI: tsnet helper yok — gömülü Tailscale devre dışı"
+fi
+
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

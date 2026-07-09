@@ -46,6 +46,15 @@ final class AppState: ObservableObject {
     @Published var pairingError: String?
     @Published var hasClaudeToken = false
     @Published var authRunning = false
+    // Gömülü userspace Tailscale (tsnet) — resmi Tailscale yoksa devreye girer
+    @Published var tsnetLocalPort: Int?
+    @Published var tsnetAuthURL: String?
+    @Published var tsnetRunning = false
+    private var tsnetProc: Process?
+    var tsnetActive: Bool { tsnetRunning && tsnetLocalPort != nil }
+    /// Gerçek bağlantı hedefi: tsnet aktifse yerel forward, değilse doğrudan tailnet IP.
+    var effectiveHost: String { tsnetActive ? "127.0.0.1" : host }
+    var effectivePort: Int { tsnetActive ? (tsnetLocalPort ?? (Int(portText) ?? 8787)) : (Int(portText) ?? 8787) }
     @Published var events: [AppEvent] = []          // toast/bildirim akışı
     // Yeni Claude oturumu seçenekleri (Claude Desktop tarzı)
     @Published var selectedModel: String { didSet { UserDefaults.standard.set(selectedModel, forKey: "opt.model") } }
@@ -58,7 +67,7 @@ final class AppState: ObservableObject {
     private var reconnectTimer: Timer?
 
     var api: AgentAPI {
-        AgentAPI(host: host, port: Int(portText) ?? 8787, token: token)
+        AgentAPI(host: effectiveHost, port: effectivePort, token: token)
     }
 
     init() {
@@ -141,12 +150,19 @@ final class AppState: ObservableObject {
         if connecting { return }
         connecting = true
         Task {
+            // Doğrudan erişilemiyorsa (resmi Tailscale yok) + host tailnet IP → gömülü tsnet başlat
+            if !tsnetActive, tsnetProc == nil, host.hasPrefix("100.") {
+                let direct = AgentAPI(host: host, port: Int(portText) ?? 8787, token: token)
+                let reachable = (try? await direct.get("/api/health", as: HealthResponse.self)) != nil
+                if !reachable { startTsnet() }
+            }
             do {
-                _ = try await api.get("/api/health", as: HealthResponse.self)
+                _ = try await api.get("/api/health", as: HealthResponse.self)      // effective (direct ya da tsnet)
                 let p = try await api.get("/api/projects", as: ProjectsResponse.self) // token'ı da doğrular
                 projects = p.projects
                 setConnected(true)
                 lastError = nil
+                tsnetAuthURL = nil
                 await refreshTerminals()
                 await fetchPCInfo()
                 fetchUsage()
@@ -285,6 +301,49 @@ final class AppState: ObservableObject {
     }
     var pinnedSessions: [DesktopSession] { desktopSessions.filter { pinnedIDs.contains($0.id) } }
     var recentSessions: [DesktopSession] { desktopSessions.filter { !pinnedIDs.contains($0.id) } }
+
+    /// Gömülü userspace Tailscale'i (bundled shrimp-tsnet) başlat; login gerekirse authURL yayınlar.
+    func startTsnet() {
+        guard tsnetProc == nil else { return }
+        guard let bin = Bundle.main.url(forResource: "shrimp-tsnet", withExtension: nil) else {
+            emit(.warning, "Tailscale yardımcısı yok", "Resmi Tailscale kurulu olmalı"); return
+        }
+        let support = (try? FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)) ?? FileManager.default.temporaryDirectory
+        let dir = support.appendingPathComponent("Shrimp/tsnet")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let target = "\(host):\(Int(portText) ?? 8787)"
+        let p = Process()
+        p.executableURL = bin
+        p.arguments = ["--target", target, "--dir", dir.path, "--hostname", "shrimp-mac"]
+        let pipe = Pipe()
+        p.standardOutput = pipe
+        p.standardError = Pipe()   // tsnet log gürültüsünü yut
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] fh in
+            let data = fh.availableData
+            guard !data.isEmpty, let s = String(data: data, encoding: .utf8) else { return }
+            for raw in s.split(separator: "\n") {
+                guard let d = raw.data(using: .utf8),
+                      let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                      let state = o["state"] as? String else { continue }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    switch state {
+                    case "needsLogin":
+                        if let u = o["authURL"] as? String { self.tsnetAuthURL = u; self.tsnetRunning = false }
+                    case "running":
+                        if let listen = o["listen"] as? String, let port = Int(listen.split(separator: ":").last ?? "") { self.tsnetLocalPort = port }
+                        self.tsnetRunning = true; self.tsnetAuthURL = nil
+                        self.connect()
+                    default: break
+                    }
+                }
+            }
+        }
+        do { try p.run(); tsnetProc = p; emit(.info, "Tailscale (gömülü) başlıyor", "tailnet'e katılınıyor…") }
+        catch { emit(.error, "tsnet başlatılamadı", error.localizedDescription) }
+    }
+
+    func openTsnetLogin() { if let s = tsnetAuthURL, let u = URL(string: s) { NSWorkspace.shared.open(u) } }
 
     /// Taze bir native sohbet başlat (her çağrıda yeni ChatTarget id → yeni oturum).
     func newNativeChat() { selection = .nativeChat(ChatTarget()) }

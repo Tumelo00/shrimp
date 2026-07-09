@@ -30,3 +30,6 @@ cr-diag.log
 # İşletim sistemi
 .DS_Store
 Thumbs.db
+
+# tsnet derlenen binary (build sirasinda uretilir)
+tsnet-helper/shrimp-tsnet
