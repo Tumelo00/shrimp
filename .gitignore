@@ -1,6 +1,7 @@
 # Bağımlılıklar / derleme çıktıları
 agent/node_modules/
-agent/run-hidden.vbs
+agent/*-hidden.vbs
+agent/*.vbs
 MacApp/ClaudeRemote/.build/
 MacApp/ClaudeRemote/.swiftpm/
 MacApp/ClaudeRemote/Package.resolved
