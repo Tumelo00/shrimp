@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Windows agent'ın GitHub deposu (agent /agent klasöründe; kurulum: agent/scripts/setup.ps1).
+/// Windows agent'ın GitHub deposu + tek-komut kurulum satırı.
 let SHRIMP_AGENT_REPO = "https://github.com/Tumelo00/shrimp"
+let SHRIMP_AGENT_INSTALL = "irm https://raw.githubusercontent.com/Tumelo00/shrimp/main/agent/install.ps1 | iex"
 
 /// Açılış kurulum sihirbazı — 4 adım: Agent · Eşleştir · Yetkilendir · Hazır.
 /// Arkadaki Shrimp menüsünü blur'lar, ortada temalı kart gösterir.
@@ -64,16 +65,27 @@ struct SetupWizardView: View {
     }
 
     private var agentStep: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Label("Windows PC'ne agent kur", systemImage: "desktopcomputer.and.arrow.down").font(.title3).bold()
-            Text("Shrimp, Windows bilgisayarındaki küçük bir 'agent' üzerinden çalışır. Aşağıdaki bağlantıdan indirip PC'ne kur (tek tıkla kurulum).")
+            Text("Shrimp, Windows PC'ndeki küçük bir 'agent' üzerinden çalışır. PC'de PowerShell'i **Yönetici olarak** aç ve şunu yapıştır:")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            Link(destination: URL(string: SHRIMP_AGENT_REPO)!) {
-                Label("Windows Agent'ı indir (GitHub)", systemImage: "arrow.down.circle.fill")
-            }.font(.callout)
-            Text("Kurduktan sonra agent sana bir 'eşleştirme kodu' verir — sonraki adımda o kodu gireceksin.")
+            HStack(spacing: 6) {
+                Text(SHRIMP_AGENT_INSTALL)
+                    .font(.system(size: 10.5, design: .monospaced)).textSelection(.enabled).lineLimit(2)
+                    .padding(8).frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.black.opacity(0.3), in: RoundedRectangle(cornerRadius: 8))
+                Button { copyText(SHRIMP_AGENT_INSTALL) } label: { Image(systemName: "doc.on.doc") }
+                    .buttonStyle(.plain).help("Kopyala")
+            }
+            Text("Node.js + agent'ı kurar, otomatik başlatır ve sana bir eşleştirme kodu verir (sonraki adımda gireceksin).")
                 .font(.caption).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
+            Link(destination: URL(string: SHRIMP_AGENT_REPO)!) { Label("Repo / detaylar (GitHub)", systemImage: "link") }.font(.caption)
         }
+    }
+
+    private func copyText(_ s: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(s, forType: .string)
     }
 
     private var pairStep: some View {

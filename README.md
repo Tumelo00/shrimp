@@ -21,25 +21,34 @@ Claude gerçekte PC'de çalışır; arayüz Mac'te native bir uygulamadır (**Sh
 > Bu depo kimsenin kişisel verisini içermez. Token her kurulumda **sizin PC'nizde**
 > üretilir (`~/.claude-remote/config.json`), repoya girmez.
 
-## Kurulum
+## Kurulum (en kolay yol)
 
-### 1) PC (Shrimp Service) — tek komut
+### 1) Mac (Shrimp)
+1. [**Releases**](https://github.com/Tumelo00/shrimp/releases) → **Shrimp-Kurulum.dmg** indir.
+2. DMG'ye **sağ tık → Aç** (imzasız olduğu için çift-tık macOS tarafından engellenir).
+3. Açılan pencerede **Shrimp Kurulum**'u **Applications**'a sürükle → **sağ tık → Aç**.
+   Shrimp'i indirir, kurar, başlatır ve kendini temizler.
+
+### 2) PC (Windows Agent) — tek komut
+PowerShell'i **Yönetici olarak** aç ve yapıştır:
 ```powershell
-cd claude-remote\agent
-powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+irm https://raw.githubusercontent.com/Tumelo00/shrimp/main/agent/install.ps1 | iex
 ```
-Script: gereksinimleri kontrol eder, `npm install` yapar, **token üretir**, boot'ta
-otomatik başlayan servisi kurar ve sonunda **Mac'e gireceğiniz bilgileri yazar**
-(Tailscale IP + Port + Token).
+Node.js + agent'ı kurar, boot'ta otomatik başlayan servisi kaydeder, başlatır ve bir
+**eşleştirme kodu** yazar.
 
-### 2) Mac (Shrimp)
-```bash
-cd claude-remote/MacApp/ClaudeRemote
-bash build_app.sh            # Shrimp.app üretir (~/Applications/Shrimp.app)
-open ~/Applications/Shrimp.app
-```
-Uygulamada PC'nin **Tailscale IP** + **Port (8787)** + **Token**'ını girin. Bir kez
-girince otomatik bağlanır; bir daha sormaz.
+### 3) Eşleştir
+Shrimp'in kurulum sihirbazında eşleştirme kodunu yapıştır → bağlanır. Bitti.
+
+> **Gereksinimler (install.ps1 eksikse uyarır):** PC'de **Claude Code** (kurulu + kendi
+> hesabınla giriş: `npm i -g @anthropic-ai/claude-code`) ve **Tailscale** (Mac+PC aynı hesap).
+
+---
+<details><summary>Kaynaktan derleme (geliştirici)</summary>
+
+**PC:** `cd agent && powershell -ExecutionPolicy Bypass -File scripts\setup.ps1`
+**Mac:** `cd MacApp/ClaudeRemote && bash build_app.sh && open ~/Applications/Shrimp.app`
+</details>
 
 ## Özellikler
 - 🖥️ **PC kartı:** CPU/RAM/disk canlı + **Uyandır (WOL) / Yeniden Başlat / Uyku**
