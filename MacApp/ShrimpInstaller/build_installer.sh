@@ -7,15 +7,17 @@ CONFIG="${1:-release}"
 APP_NAME="Shrimp Kurulum"
 APP="$HOME/Applications/$APP_NAME.app"
 DMG="$HOME/Applications/Shrimp-Kurulum.dmg"
-LOGO="../ClaudeRemote/assets/shrimp-logo.png"
+LOGO="assets/installer-icon.png"    # kurulum sihirbazı ikonu (karides + dişli)
 
 echo "==> swift build ($CONFIG)"
 swift build -c "$CONFIG"
 BIN=".build/$CONFIG/ShrimpInstaller"
 
-echo "==> ikon (shrimp logo)"
+echo "==> ikon (kurulum ikonu — merkez kirpma)"
 if [ -f "$LOGO" ]; then
-  sips -c 920 920 "$LOGO" --out /tmp/si_crop.png >/dev/null 2>&1
+  W=$(sips -g pixelWidth "$LOGO" 2>/dev/null | awk '/pixelWidth/{print $2}')
+  CROP=$(( ${W:-1254} * 72 / 100 ))   # dis koyu bosluk atilir, yuvarlak ikon kalir
+  sips -c "$CROP" "$CROP" "$LOGO" --out /tmp/si_crop.png >/dev/null 2>&1
   sips -z 1024 1024 /tmp/si_crop.png --out /tmp/si_shrimp.png >/dev/null 2>&1
   ICONSET=/tmp/ShrimpInst.iconset
   rm -rf "$ICONSET"; mkdir -p "$ICONSET"
