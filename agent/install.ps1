@@ -56,6 +56,7 @@ if ($admin) {
   Write-Host "5) Servis kaydediliyor + baslatiliyor..." -ForegroundColor Cyan
   & powershell -ExecutionPolicy Bypass -File (Join-Path $Dir 'scripts\install-task.ps1')
   Start-ScheduledTask -TaskName ClaudeRemoteAgent -EA SilentlyContinue
+  Start-ScheduledTask -TaskName ClaudeRemoteTray -EA SilentlyContinue   # tepsi ikonu hemen gorunsun
   Start-Sleep 3
 } else {
   Write-Host "5) (Admin olmadigi icin otomatik-baslatma atlandi) Elle baslat: node `"$Dir\src\server.js`"" -ForegroundColor Yellow

@@ -140,7 +140,7 @@ function handleSetupToken() {
 const server = http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
   const p = parsed.pathname;
-  if (p === '/api/health') return json(res, 200, { ok: true, name: 'claude-remote-agent', version: '0.1.0', hasClaudeToken: !!cfg.claudeOAuthToken });
+  if (p === '/api/health') return json(res, 200, { ok: true, name: 'claude-remote-agent', version: '0.1.0', hasClaudeToken: !!cfg.claudeOAuthToken, clients: clients.size, terminals: terminals.sessions.size });
   if (!auth(req, parsed)) return json(res, 401, { error: 'unauthorized' });
   try {
     if (req.method === 'GET') {

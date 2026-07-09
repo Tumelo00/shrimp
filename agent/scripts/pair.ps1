@@ -17,7 +17,9 @@ $code = -join ((1..6) | ForEach-Object { Get-Random -Maximum 10 })
 $payload = "{""v"":1,""host"":""$($info.host)"",""port"":$($info.port),""token"":""$($info.token)""}"
 $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
 $topic = "shrimp-pair-$code"
-function Publish { try { Invoke-WebRequest -Method Post -Uri "https://ntfy.sh/$topic" -Body $b64 -UseBasicParsing -TimeoutSec 8 | Out-Null } catch {} }
+# ntfy poll=1 cache'i mesaji ~12sa tutar -> Mac sonradan da cekebilir; tek yayin yeter,
+# yine de ara ara tekrarla (sigorta). Kisa timeout: UI thread'i uzun bloklamasin.
+function Publish { try { Invoke-WebRequest -Method Post -Uri "https://ntfy.sh/$topic" -Body $b64 -UseBasicParsing -TimeoutSec 4 | Out-Null } catch {} }
 Publish
 
 $form = New-Object Windows.Forms.Form
@@ -41,12 +43,24 @@ $lblCode.Font = New-Object Drawing.Font("Consolas", 46, [Drawing.FontStyle]::Bol
 $lblCode.AutoSize = $true; $lblCode.Location = New-Object Drawing.Point(90, 80)
 $form.Controls.Add($lblCode)
 
+$blue  = [Drawing.Color]::FromArgb(60, 130, 246)
+$green = [Drawing.Color]::FromArgb(34, 172, 96)
 $btn = New-Object Windows.Forms.Button
 $btn.Text = "Kopyala"; $btn.Size = New-Object Drawing.Size(150, 42)
 $btn.Location = New-Object Drawing.Point(145, 185)
-$btn.FlatStyle = 'Flat'; $btn.BackColor = [Drawing.Color]::FromArgb(60, 130, 246); $btn.ForeColor = [Drawing.Color]::White
+$btn.FlatStyle = 'Flat'; $btn.FlatAppearance.BorderSize = 0
+$btn.BackColor = $blue; $btn.ForeColor = [Drawing.Color]::White
 $btn.Font = New-Object Drawing.Font("Segoe UI", 11)
-$btn.Add_Click({ Set-Clipboard $code; $btn.Text = "Kopyalandi!" })
+# Kopyalama gorsel-geri-bildirimi: yesil flas + tik + 1.6sn sonra geri don
+$revert = New-Object Windows.Forms.Timer
+$revert.Interval = 1600
+$revert.Add_Tick({ $revert.Stop(); $btn.Text = "Kopyala"; $btn.BackColor = $blue })
+$btn.Add_Click({
+    Set-Clipboard $code
+    $btn.Text = [char]0x2713 + " Kopyalandi"
+    $btn.BackColor = $green
+    $revert.Stop(); $revert.Start()
+})
 $form.Controls.Add($btn)
 
 $lbl2 = New-Object Windows.Forms.Label
@@ -56,10 +70,29 @@ $lbl2.Font = New-Object Drawing.Font("Segoe UI", 9)
 $lbl2.AutoSize = $true; $lbl2.Location = New-Object Drawing.Point(70, 250)
 $form.Controls.Add($lbl2)
 
-# Mac subscribe olunca yakalasin diye periyodik yeniden yayinla
+# Baglaninca oto-kapat. YENI bir baglanti bekle: acilistaki mevcut istemci sayisini baz al
+# (zaten bagli bir Mac varken ikinci cihaz eslestirirken yanlis kapanmasin).
+$healthUrl = "http://$($info.host):$($info.port)/api/health"
+$script:baseClients = 0
+try { $hb = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 2; if ($hb.clients) { $script:baseClients = [int]$hb.clients } } catch {}
+$closeTimer = New-Object Windows.Forms.Timer
+$closeTimer.Interval = 1800
+$closeTimer.Add_Tick({ $closeTimer.Stop(); $form.Close() })
+$script:pt = 0
 $timer = New-Object Windows.Forms.Timer
-$timer.Interval = 4000
-$timer.Add_Tick({ Publish })
+$timer.Interval = 3000
+$timer.Add_Tick({
+    $script:pt++
+    if ($script:pt % 5 -eq 0) { Publish }   # ~her 15sn'de bir sigorta yeniden-yayin
+    try {
+        $h = Invoke-RestMethod -Uri $healthUrl -TimeoutSec 2
+        if ([int]$h.clients -gt $script:baseClients) {   # yalnizca YENI baglanti
+            $lbl1.Text = "Mac baglandi!"; $lbl1.ForeColor = $green
+            $lbl2.Text = "Baglanti kuruldu, bu pencere kapaniyor..."
+            $timer.Stop(); $closeTimer.Start()
+        }
+    } catch {}
+})
 $timer.Start()
 
 [void]$form.ShowDialog()
