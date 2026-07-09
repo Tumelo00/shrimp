@@ -62,7 +62,25 @@ echo "==> DMG oluşturuluyor: $DMG"
 STAGE=/tmp/shrimp_dmg_stage
 rm -rf "$STAGE" "$DMG"; mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
-hdiutil create -volname "Shrimp Kurulum" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+if command -v appdmg >/dev/null 2>&1 && [ -f assets/dmg-bg.png ]; then
+  echo "    appdmg (temalı, drag-to-Applications — arka plan 1x/2x)"
+  cat > /tmp/appdmg-spec.json <<EOF
+{
+  "title": "Shrimp Kurulum",
+  "background": "$(pwd)/assets/dmg-bg.png",
+  "icon-size": 128,
+  "window": { "size": { "width": 600, "height": 400 } },
+  "contents": [
+    { "x": 150, "y": 195, "type": "file", "path": "$APP" },
+    { "x": 450, "y": 195, "type": "link", "path": "/Applications" }
+  ]
+}
+EOF
+  appdmg /tmp/appdmg-spec.json "$DMG" 2>&1 | tail -2
+else
+  echo "    (appdmg yok — düz DMG; kur: npm i -g appdmg)"
+  hdiutil create -volname "Shrimp Kurulum" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+fi
 echo "==> tamam:"
 echo "    app: $APP"
 echo "    dmg: $DMG"

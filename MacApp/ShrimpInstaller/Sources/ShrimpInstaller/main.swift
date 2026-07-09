@@ -70,6 +70,7 @@ final class Installer: ObservableObject {
         sleep 3
         for v in /Volumes/Shrimp*; do /usr/bin/hdiutil detach "$v" -force >/dev/null 2>&1; done
         rm -f "$HOME/Downloads/Shrimp"*.dmg "$HOME/Desktop/Shrimp"*.dmg 2>/dev/null
+        rm -rf "/Applications/Shrimp Kurulum.app" "$HOME/Applications/Shrimp Kurulum.app" 2>/dev/null
         """
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/bash")
