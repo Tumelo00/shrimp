@@ -95,21 +95,51 @@ final class AppState: ObservableObject {
         setupComplete = d.bool(forKey: "setupComplete") || (!cfgHost.isEmpty && !cfgTok.isEmpty)
     }
 
-    /// Eşleştirme kodunu çöz (base64 → {host,port,token}) ve bağlan.
+    /// Eşleştirme kodu: 6 haneli kısa kod (ntfy rendezvous) ya da base64 blob (geriye uyum).
     func applyPairingCode(_ code: String) {
-        let t = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let t = code.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: " ", with: "")
+        if t.count == 6, t.allSatisfy(\.isNumber) {
+            pairingError = nil
+            Task { await fetchPairingViaNtfy(t) }
+            return
+        }
+        applyPairingPayload(base64: t)
+    }
+
+    /// PC'nin ntfy'e yayınladığı payload'u kısa kodla çek → bağlan.
+    private func fetchPairingViaNtfy(_ code: String) async {
+        guard let url = URL(string: "https://ntfy.sh/shrimp-pair-\(code)/json?poll=1") else { return }
+        guard let (data, _) = try? await URLSession.shared.data(from: url) else {
+            pairingError = "Bağlantı hatası — internet var mı?"; return
+        }
+        for line in (String(data: data, encoding: .utf8) ?? "").split(separator: "\n").reversed() {
+            guard let d = line.data(using: .utf8),
+                  let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+                  (o["event"] as? String) == "message",
+                  let msg = o["message"] as? String, applyPairingPayloadReturning(base64: msg) else { continue }
+            return
+        }
+        pairingError = "Kod bulunamadı — PC'deki eşleştirme penceresi açık mı? (kodun süresi dolmuş olabilir)"
+    }
+
+    @discardableResult
+    private func applyPairingPayloadReturning(base64 t: String) -> Bool {
         guard let data = Data(base64Encoded: t),
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let h = (obj["host"] as? String), !h.isEmpty,
-              let tok = (obj["token"] as? String), !tok.isEmpty else {
-            pairingError = "Kod çözülemedi — kodu eksiksiz kopyaladığından emin ol."
-            return
-        }
+              let tok = (obj["token"] as? String), !tok.isEmpty else { return false }
         pairingError = nil
         host = h
         if let port = obj["port"] as? Int { portText = String(port) }
         token = tok
         connect()
+        return true
+    }
+
+    private func applyPairingPayload(base64 t: String) {
+        if !applyPairingPayloadReturning(base64: t) {
+            pairingError = "Kod çözülemedi — 6 haneli kodu doğru girdiğinden emin ol."
+        }
     }
 
     /// Native chat için Anthropic yetkilendirme (agent setup-token'ı çalıştırır).

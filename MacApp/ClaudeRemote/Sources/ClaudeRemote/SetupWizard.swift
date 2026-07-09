@@ -90,16 +90,18 @@ struct SetupWizardView: View {
 
     private var pairStep: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Eşleştirme kodunu yapıştır", systemImage: "qrcode.viewfinder").font(.title3).bold()
-            Text("PC'deki agent'ın gösterdiği kodu (uzun bir metin) buraya yapıştır ve Bağlan'a bas.")
+            Label("Eşleştirme kodunu gir", systemImage: "number.circle.fill").font(.title3).bold()
+            Text("PC'de açılan pencerede **6 haneli** bir kod var. Onu gir ve Bağlan'a bas.")
                 .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            TextField("Eşleştirme kodu…", text: $pairingCode, axis: .vertical)
-                .textFieldStyle(.plain).lineLimit(2...4).padding(9)
-                .background(Color.secondary.opacity(0.1), in: RoundedRectangle(cornerRadius: 9))
-                .font(.system(.caption, design: .monospaced))
+            TextField("6 haneli kod", text: $pairingCode)
+                .textFieldStyle(.plain)
+                .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                .multilineTextAlignment(.center).padding(.vertical, 10)
+                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+                .onSubmit { app.applyPairingCode(pairingCode) }
             if let e = app.pairingError { Text(e).font(.caption).foregroundStyle(.red) }
             if app.connected { Label("Bağlandı", systemImage: "checkmark.circle.fill").font(.caption).foregroundStyle(.green) }
-            Button("Manuel gir (IP · port · token)") { withAnimation { showManual.toggle() } }
+            Button("Manuel (IP · port · token)") { withAnimation { showManual.toggle() } }
                 .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
             if showManual {
                 VStack(spacing: 6) {

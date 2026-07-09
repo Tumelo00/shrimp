@@ -63,7 +63,7 @@ if ($admin) {
   Start-Sleep 3
 }
 
-# 6) Eslestirme kodu
-Write-Host "`n=== ESLESTIRME KODU (Mac'teki Shrimp sihirbazina yapistir) ===`n" -ForegroundColor Cyan
-node (Join-Path $Dir 'scripts\pairing-code.js')
-Write-Host "`nKurulum tamam. Yukaridaki kodu Mac'teki Shrimp'e gir.`n" -ForegroundColor Green
+# 6) Eslestirme (6 haneli kod — GUI pencere + kopyala)
+Write-Host "`nKurulum tamam! Eslestirme penceresi aciliyor (6 haneli kod)..." -ForegroundColor Green
+& powershell -ExecutionPolicy Bypass -File (Join-Path $Dir 'scripts\pair.ps1')
+Write-Host "Pencereyi tekrar acmak icin: powershell -ExecutionPolicy Bypass -File `"$Dir\scripts\pair.ps1`"" -ForegroundColor DarkGray
