@@ -54,6 +54,17 @@ struct AgentAPI: Sendable {
         }
     }
 
+    /// Hafif erisilebilirlik yoklamasi (kisa timeout, token/govde yok) — uyandirma
+    /// kartini yalnizca PC GERCEKTEN erisilemezse gostermek icin.
+    func reachable(timeout: TimeInterval) async -> Bool {
+        guard let u = url(scheme: "http", path: "/api/health", query: [:]) else { return false }
+        var req = URLRequest(url: u)
+        req.timeoutInterval = timeout
+        guard let (_, resp) = try? await URLSession.shared.data(for: req) else { return false }
+        if let http = resp as? HTTPURLResponse { return (200..<300).contains(http.statusCode) }
+        return false
+    }
+
     func get<T: Decodable>(_ path: String, query: [String: String] = [:], as type: T.Type) async throws -> T {
         let (data, resp) = try await URLSession.shared.data(for: makeRequest(path, query: query, method: "GET", body: nil))
         try Self.checkStatus(resp)

@@ -211,6 +211,8 @@ final class AppState: ObservableObject {
     private func setConnected(_ v: Bool, error: String? = nil) {
         let was = connected
         connected = v
+        // Bağlanınca uyandırma kartını anında kapat (blokaj UI'da kalmasın).
+        if v && wakeState != .idle { cancelWake() }
         if let error { lastError = error }
         if v && !was {
             emit(.success, "PC'ye bağlandı", stats?.hostname ?? pcInfo?.hostname ?? host)
@@ -425,10 +427,24 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Uygulama açılışında PC uykudaysa uyandırma kartını başlat (kısa bekleme sonrası).
+    /// Uygulama açılışında PC GERÇEKTEN erişilemezse uyandırma kartını başlat.
+    /// Erişilebiliyorsa (PC açık, tailnet ilk yol kurulumu sadece yavaş) BLOKLAYAN
+    /// kartı GÖSTERME — sessizce bağlan; böylece pencere kilitlenmez.
     func autoWakeIfNeeded() {
         guard wakeState == .idle, !connected, !host.isEmpty, !token.isEmpty else { return }
-        startWake()
+        Task {
+            let probe = AgentAPI(host: host, port: Int(portText) ?? 8787, token: token)
+            // Tailnet ilk bağlantısı yavaş olabilir → birkaç kez yokla (~15sn) önce.
+            for _ in 0..<3 {
+                if connected || wakeState != .idle { return }
+                if await probe.reachable(timeout: 5) {
+                    if !connected { connect() }   // PC ayakta → kartsız, sessiz bağlan
+                    return
+                }
+            }
+            // Hâlâ erişilemiyor → PC gerçekten uykuda/kapalı → uyandırma kartı
+            if wakeState == .idle, !connected { startWake() }
+        }
     }
 
     /// Uyandırma kartını başlat: yerel WOL + ntfy(ESP32) → sağlık → bağlan.
