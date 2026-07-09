@@ -1,0 +1,32 @@
+# Bağımlılıklar / derleme çıktıları
+agent/node_modules/
+agent/run-hidden.vbs
+MacApp/ClaudeRemote/.build/
+MacApp/ClaudeRemote/.swiftpm/
+MacApp/ClaudeRemote/Package.resolved
+
+# Kişisel veri / sırlar — ASLA pushlanmaz
+# (agent config + token + oturum state kullanıcının ~/.claude-remote'unda tutulur,
+#  repoda değil; yine de yanlışlıkla eklenmesin diye:)
+**/.claude-remote/
+**/config.json
+.credentials.json
+*.token
+*token-out*.log
+*-status.json
+admin-*.ps1
+native-sessions.json
+desktop-sessions.json
+desktop-titles.json
+state/
+cr-shot*.png
+cr-diag.log
+
+# Derlenmiş uygulama/installer (Release olarak yüklenir)
+*.app/
+*.dmg
+*.zip
+
+# İşletim sistemi
+.DS_Store
+Thumbs.db

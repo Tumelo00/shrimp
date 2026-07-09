@@ -1,0 +1,17 @@
+{
+  "name": "shrimp-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shrimp Service — Mac'teki Shrimp uygulamasının bağlandığı Windows PC ajanı (uzak Claude Code)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "setup": "powershell -ExecutionPolicy Bypass -File scripts/setup.ps1",
+    "install-service": "powershell -ExecutionPolicy Bypass -File scripts/install-task.ps1",
+    "smoke": "node scripts/smoke.js"
+  },
+  "dependencies": {
+    "@lydell/node-pty": "^1.1.0",
+    "ws": "^8.18.0"
+  }
+}
