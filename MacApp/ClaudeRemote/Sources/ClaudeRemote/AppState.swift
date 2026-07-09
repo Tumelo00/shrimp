@@ -64,6 +64,7 @@ final class AppState: ObservableObject {
     private let statsSocket = StatsSocket()
     private var didRestoreTerminals = false
     private var connecting = false
+    private var disconnectNotify: DispatchWorkItem?   // kopuş bildirimini geciktirip blip'lerde iptal etmek için
     private var reconnectTimer: Timer?
 
     var api: AgentAPI {
@@ -182,9 +183,11 @@ final class AppState: ObservableObject {
         Task {
             // Doğrudan erişilemiyorsa (resmi Tailscale yok) + host tailnet IP → gömülü tsnet başlat
             if !tsnetActive, tsnetProc == nil, host.hasPrefix("100.") {
+                // Doğrudan (resmi Tailscale) yolu YAVAŞ kurulabilir (ilk bağlantı 20-30sn);
+                // kısa probe yanlışlıkla tsnet'i başlatır → gereksiz ikinci node. Bu KARAR için
+                // cömert timeout ver (tsnet yalnızca yol gerçekten yoksa devreye girsin).
                 let direct = AgentAPI(host: host, port: Int(portText) ?? 8787, token: token)
-                let reachable = (try? await direct.get("/api/health", as: HealthResponse.self)) != nil
-                if !reachable { startTsnet() }
+                if !(await direct.reachable(timeout: 15)) { startTsnet() }
             }
             do {
                 _ = try await api.get("/api/health", as: HealthResponse.self)      // effective (direct ya da tsnet)
@@ -215,10 +218,19 @@ final class AppState: ObservableObject {
         if v && wakeState != .idle { cancelWake() }
         if let error { lastError = error }
         if v && !was {
+            disconnectNotify?.cancel(); disconnectNotify = nil   // bekleyen kopuş bildirimini iptal et
             emit(.success, "PC'ye bağlandı", stats?.hostname ?? pcInfo?.hostname ?? host)
         } else if !v && was {
-            emit(.error, "Bağlantı koptu", "PC ile bağlantı kesildi. Otomatik yeniden deneniyor…",
-                 code: "NET_DISCONNECT", notify: true)
+            // Geçici stats-WS blip'lerinde sesli alarm çalmasın: 6sn sonra HÂLÂ kopuksa bir
+            // kez bildir (hızlı toparlanan blip'ler sessiz geçer, spam olmaz).
+            disconnectNotify?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, !self.connected else { return }
+                self.emit(.error, "Bağlantı koptu", "PC ile bağlantı kesildi. Otomatik yeniden deneniyor…",
+                          code: "NET_DISCONNECT", notify: true)
+            }
+            disconnectNotify = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6, execute: work)
         }
     }
 
@@ -371,11 +383,28 @@ final class AppState: ObservableObject {
                 }
             }
         }
+        // Yardımcı ölürse durumu sıfırla — yoksa tsnetProc != nil kalıp yeniden-başlatmayı
+        // (guard tsnetProc == nil) kalıcı engeller, app erişilemez host'a takılır.
+        p.terminationHandler = { [weak self] _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.tsnetProc = nil; self.tsnetRunning = false; self.tsnetLocalPort = nil
+            }
+        }
         do { try p.run(); tsnetProc = p; emit(.info, "Tailscale (gömülü) başlıyor", "tailnet'e katılınıyor…") }
         catch { emit(.error, "tsnet başlatılamadı", error.localizedDescription) }
     }
 
     func openTsnetLogin() { if let s = tsnetAuthURL, let u = URL(string: s) { NSWorkspace.shared.open(u) } }
+
+    /// tsnet login kartını iptal et: yardımcıyı durdur + authURL'i temizle (overlay kapanır).
+    func cancelTsnetLogin() {
+        tsnetProc?.terminate()
+        tsnetProc = nil
+        tsnetAuthURL = nil
+        tsnetRunning = false
+        tsnetLocalPort = nil
+    }
 
     /// Taze bir native sohbet başlat (her çağrıda yeni ChatTarget id → yeni oturum).
     func newNativeChat() { selection = .nativeChat(ChatTarget()) }
@@ -479,7 +508,7 @@ final class AppState: ObservableObject {
             for _ in 0..<3 {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 if Task.isCancelled { return }
-                if (try? await api.get("/api/health", as: HealthResponse.self)) != nil {
+                if await api.reachable(timeout: 4) {   // 15sn değil, kısa probe (WOL cadence korunur)
                     wakeState = .verifying
                     connect()
                     for _ in 0..<12 {
@@ -652,5 +681,6 @@ final class AppState: ObservableObject {
     func disconnectAll() {
         statsSocket.stop()
         for t in terminals { t.backend.close() }
+        tsnetProc?.terminate(); tsnetProc = nil   // gömülü tsnet yardımcısını orphan bırakma
     }
 }

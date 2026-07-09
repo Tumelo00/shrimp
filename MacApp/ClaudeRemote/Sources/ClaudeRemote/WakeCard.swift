@@ -45,7 +45,9 @@ struct WakeCardView: View {
                 Text("Deneme \(app.wakeAttempts)").font(.caption2).foregroundStyle(.tertiary)
             }
             if app.wakeState == .failed { failedActions }
-            if app.wakeState == .waking { cancelButton }
+            // .verifying'de de iptal olabilsin: sağlık OK ama bağlanamıyorsa (ör. token hatası)
+            // pencere ~90sn kilitlenmesin.
+            if app.wakeState == .waking || app.wakeState == .verifying { cancelButton }
         }
     }
 
@@ -129,6 +131,8 @@ struct TsnetLoginOverlay: View {
                     Label("Tarayıcıda Giriş Yap", systemImage: "arrow.up.right.square")
                 }.buttonStyle(.borderedProminent).controlSize(.large)
                 Text("Onayladıktan sonra otomatik bağlanır.").font(.caption).foregroundStyle(.tertiary)
+                Button("Vazgeç") { app.cancelTsnetLogin() }   // iptal → overlay kapanır, app kilitlenmez
+                    .buttonStyle(.plain).font(.caption).foregroundStyle(.secondary)
             }
             .frame(width: 380).padding(26)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))

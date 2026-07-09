@@ -104,10 +104,14 @@ final class StatsSocket {
     private let session = URLSession(configuration: .default)
     private var url: URL?
     private var active = false
+    // Her open/stop bir "nesil"; eski socket'in geciken callback'leri ve zamanlanmış
+    // yeniden-açma denemeleri geçersiz kılınır (aksi halde kopuşta socket sızar/çiftlenir).
+    private var generation = 0
 
     var onStats: ((StatsSnapshot) -> Void)?
     var onConnectionChange: ((Bool) -> Void)?
 
+    // Tüm durum (active/task/generation) YALNIZCA ana thread'de okunur/yazılır (veri yarışı yok).
     func start(url: URL) {
         stop()
         self.url = url
@@ -117,35 +121,42 @@ final class StatsSocket {
 
     private func open() {
         guard active, let url else { return }
+        task?.cancel(with: .normalClosure, reason: nil)   // eski socket'i sızdırma
+        generation += 1
+        let gen = generation
         let t = session.webSocketTask(with: url)
         task = t
         t.resume()
-        receive()
+        receive(gen: gen)
     }
 
-    private func receive() {
+    private func receive(gen: Int) {
         task?.receive { [weak self] result in
-            guard let self, self.active else { return }
-            switch result {
-            case .failure:
-                DispatchQueue.main.async { self.onConnectionChange?(false) }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.open() }
-            case .success(let msg):
-                if case .string(let s) = msg,
-                   let d = s.data(using: .utf8),
-                   let snap = try? JSONDecoder().decode(StatsSnapshot.self, from: d) {
-                    DispatchQueue.main.async {
+            DispatchQueue.main.async {
+                guard let self, self.active, gen == self.generation else { return }  // eski nesli yok say
+                switch result {
+                case .failure:
+                    self.onConnectionChange?(false)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                        guard let self, self.active, gen == self.generation else { return }
+                        self.open()
+                    }
+                case .success(let msg):
+                    if case .string(let s) = msg,
+                       let d = s.data(using: .utf8),
+                       let snap = try? JSONDecoder().decode(StatsSnapshot.self, from: d) {
                         self.onConnectionChange?(true)
                         self.onStats?(snap)
                     }
+                    self.receive(gen: gen)
                 }
-                self.receive()
             }
         }
     }
 
     func stop() {
         active = false
+        generation += 1   // bekleyen yeniden-açmaları ve geciken callback'leri geçersiz kıl
         task?.cancel(with: .normalClosure, reason: nil)
         task = nil
     }

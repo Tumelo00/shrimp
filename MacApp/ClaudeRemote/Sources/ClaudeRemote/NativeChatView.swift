@@ -438,7 +438,7 @@ struct NativeChatView: View {
                         Image(systemName: "arrow.up.circle.fill").font(.system(size: 26))
                             .foregroundStyle(input.trimmingCharacters(in: .whitespaces).isEmpty ? Color.secondary.opacity(0.4) : Color.accentColor)
                     }
-                    .buttonStyle(.plain).disabled(input.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .buttonStyle(.plain).disabled(input.trimmingCharacters(in: .whitespaces).isEmpty || loadingHistory)
                     .help("Gönder")
                 }
             }
@@ -500,6 +500,9 @@ struct NativeChatView: View {
     }
 
     private func sendCurrent() {
+        // Geçmiş yüklenirken gönderme: preload() sonradan history'yi öne ekleyince akış
+        // index'leri (streamIdx/toolIndexByID) kayar → mesajlar yanlış balona yazılır.
+        guard !loadingHistory else { return }
         let t = input
         input = ""
         chat.send(t)
